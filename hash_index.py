@@ -22,18 +22,47 @@ import json
     }
 '''
 
+# reads file with data and builds hash map
+def read_data_file(data_file: TextIO) -> dict | None:
+    if not data_file:
+        print("No data in file to read\n")
+        return None
 
+    index_table = {}
 
+    data_file.seek(0)
+
+    while True:
+        line = data_file.readline()
+        
+        if not line:
+            break
+
+        line_split = line.split(",", 1)
+        print(line_split)
+
+        index_table[line_split[0]] = data_file.tell()
+
+    return index_table
 # returns record given an ID
-def get(record_id: int, records: dict, data_file: TextIO) -> dict:
+def get(record_id: int, records: dict, data_file: TextIO) -> dict | None:
     # first check in our hashsmap that its in there, if not in there then do not return anytthing
+    # if not found, return some code like not found
 
     if record_id in records:
         # seek to the file offset
         print("hello")
 
+        byte_offset = records[record_id]
+        data_file.seek(byte_offset)
 
-    return {}
+        record = data_file.readline()
+        print(record)
+        return None
+
+        # seeks to the start of the line, have to skip the ID part
+    else:
+        return None
 
 
 
@@ -41,6 +70,7 @@ def get(record_id: int, records: dict, data_file: TextIO) -> dict:
 
 # set()
 # return -1 for fail, 1 for success
+# records is the in-memory hashmap that stores the id: byte_offset
 def insert(records: dict, data_file: TextIO) -> None:
 
     record_id = int(input("enter new record ID: "))
@@ -66,7 +96,6 @@ def insert(records: dict, data_file: TextIO) -> None:
 
     data_file.write(record_entry)
     
-
 def update() -> int:
     return 0
 
@@ -86,10 +115,10 @@ def create_entry() -> dict:
 
         response = input("value ('t' for True 'f' for false): ")
 
-        if response_data_type == 2:
+        if response_data_type == '2':
             response = True if response.lower() == 't' else False
 
-        if response_data_type == 1:
+        if response_data_type == '1':
             response = int(response)
 
         entry[response_key_name] = response
@@ -99,12 +128,6 @@ def create_entry() -> dict:
             break
         
     return entry
-
-
-
-def create_index() -> dict:
-    return {}
-
 
 def main_loop(records: dict, open_file: TextIO):
     print("-----------------------")
@@ -121,8 +144,8 @@ def main_loop(records: dict, open_file: TextIO):
             break
 
         if res == 1:
-            # get()
-            print("get")
+            record_id = input("Enter ID to look up: ")
+            get(record_id, records, open_file)
         elif res == 2:
             insert(records, open_file)
         else:
@@ -135,13 +158,13 @@ def main_loop(records: dict, open_file: TextIO):
 
 
 # open file in read and write mode
-data = open("data/data.txt", "a+")
+# data = open("data/data.txt", "a+")
 data = input("enter file name: ")
 data_file = open(f"data/{data}.txt", "a+")
 
-index_table = {}
+index_table = read_data_file(data_file)
+print(index_table)
 
 main_loop(index_table, data_file)
 
-print(data_file.read())
 data_file.close()
