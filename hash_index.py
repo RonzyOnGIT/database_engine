@@ -5,34 +5,18 @@ import json
 
 # each key is mapped to byte offset in data file
 # Whenever u want to look up value, use hash map to find offset in data file, seek to that location and read the value
-
-
 # data is stored on disk as an append-only file
 
 
-# for now assume txt file
-
-
-
-# data is looking like:
-'''
-    ID: {
-        "name": "John",
-        "age": 20
-    }
-'''
-
-# reads file with data and builds hash map
+# reads file with data and build hash map
 def read_data_file(data_file: TextIO) -> dict | None:
-    if not data_file:
-        print("No data in file to read\n")
-        return None
-
     index_table = {}
 
     data_file.seek(0)
 
     while True:
+        # get seek position before read line
+        current_pointer_position = data_file.tell()
         line = data_file.readline()
         
         if not line:
@@ -41,38 +25,24 @@ def read_data_file(data_file: TextIO) -> dict | None:
         line_split = line.split(",", 1)
         print(line_split)
 
-        index_table[line_split[0]] = data_file.tell()
+        index_table[int(line_split[0])] = current_pointer_position
 
     return index_table
+
 # returns record given an ID
 def get(record_id: int, records: dict, data_file: TextIO) -> dict | None:
-    # first check in our hashsmap that its in there, if not in there then do not return anytthing
-    # if not found, return some code like not found
-
     if record_id in records:
-        # seek to the file offset
-        print("hello")
-
         byte_offset = records[record_id]
         data_file.seek(byte_offset)
-
         record = data_file.readline()
-        print(record)
-        return None
-
-        # seeks to the start of the line, have to skip the ID part
+        record_split = record.split(",", 1)
+        return json.loads(record_split[1])
     else:
         return None
 
-
-
-
-
-# set()
 # return -1 for fail, 1 for success
 # records is the in-memory hashmap that stores the id: byte_offset
 def insert(records: dict, data_file: TextIO) -> None:
-
     record_id = int(input("enter new record ID: "))
 
     record_object = create_entry()
@@ -87,22 +57,15 @@ def insert(records: dict, data_file: TextIO) -> None:
     # convert ID and record object into one entry
     record_entry = str(record_id) + "," + string_record + "\n"
 
-    # empty, offset is zero
-    if not data_file:
-        records[record_id] = 0
-    else:
-        # not empty, byte offset is the end of file
-        records[record_id] = data_file.tell()
+    # file pointer could be pointing somewhere besides end, reset it
+    data_file.seek(0, 2)
+
+    records[record_id] = data_file.tell()
 
     data_file.write(record_entry)
     
-def update() -> int:
-    return 0
-
-
 # create some object type with any fields
 def create_entry() -> dict:
-
     entry = {}
 
     while True:
@@ -144,8 +107,12 @@ def main_loop(records: dict, open_file: TextIO):
             break
 
         if res == 1:
-            record_id = input("Enter ID to look up: ")
-            get(record_id, records, open_file)
+            record_id = int(input("Enter ID to look up: "))
+            record = get(record_id, records, open_file)
+            if record:
+                print(record)
+            else:
+                print("no record found\n")
         elif res == 2:
             insert(records, open_file)
         else:
@@ -156,9 +123,6 @@ def main_loop(records: dict, open_file: TextIO):
         print("[3] QUIT Stop db engine")
 
 
-
-# open file in read and write mode
-# data = open("data/data.txt", "a+")
 data = input("enter file name: ")
 data_file = open(f"data/{data}.txt", "a+")
 
