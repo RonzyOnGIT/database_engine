@@ -40,19 +40,14 @@ def get(record_id: int, records: dict, data_file: TextIO) -> dict | None:
     else:
         return None
 
-# return -1 for fail, 1 for success
 # records is the in-memory hashmap that stores the id: byte_offset
-def insert(records: dict, data_file: TextIO) -> None:
-    record_id = int(input("enter new record ID: "))
-
-    record_object = create_entry()
-
+def insert(records: dict, data_file: TextIO, record_id: int, record: dict) -> None:
     # fail if nothing to insert
-    if not record_object:
+    if not record:
         return
 
     # convert dictionary to json
-    string_record = json.dumps(record_object)
+    string_record = json.dumps(record)
 
     # convert ID and record object into one entry
     record_entry = str(record_id) + "," + string_record + "\n"
@@ -60,9 +55,12 @@ def insert(records: dict, data_file: TextIO) -> None:
     # file pointer could be pointing somewhere besides end, reset it
     data_file.seek(0, 2)
 
-    records[record_id] = data_file.tell()
-
+    # first get offset before saving to hashmap in case of error
+    offset = data_file.tell()
     data_file.write(record_entry)
+    data_file.flush()
+    records[record_id] = offset
+
     
 # create some object type with any fields
 def create_entry() -> dict:
@@ -109,12 +107,14 @@ def main_loop(records: dict, open_file: TextIO):
         if res == 1:
             record_id = int(input("Enter ID to look up: "))
             record = get(record_id, records, open_file)
-            if record:
-                print(record)
-            else:
+            if record is None:
                 print("no record found\n")
+            else:
+                print(record)
         elif res == 2:
-            insert(records, open_file)
+            record_id = int(input("enter id: "))
+            record = create_entry()
+            insert(records, open_file, record_id, record)
         else:
             print("invalid response")
 
