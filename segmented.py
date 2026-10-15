@@ -5,11 +5,6 @@ from pathlib import Path
 import os
 # Use an in-memory hash map to retrieve contents of file in disk
 
-# each key is mapped to byte offset in data file
-# Whenever u want to look up value, use hash map to find offset in data file, seek to that location and read the value
-# data is stored on disk as an append-only file
-
-
 # achieve compaction by throwing away duplicate keys in log, and keeping only most recent update for each key
 # a segment is essentially one log file
 # segment files are immutable, meaning when merging, generate a new segment
@@ -24,13 +19,32 @@ import os
 
 # Once this limit is hit, then just perform compaction by removing dupes
 # Ofc it has limits, like if every entry is unique then compaction is useless
-# For that case, then implement figure it out later
 MAX_SEGMENT_SIZE = 128
 
+# have to test this out first
+def compact(data_file: TextIO, index_table: dict) -> dict | None:
+    original_path = Path(data_file.name)
+    segment_num = int(original_path.stem.split("_")[-1])
+    new_segment_path = original_path.parent / f"segment_{segment_num + 1}.txt"
 
-def compact(data_file: TextIO, index_table: dict) -> dict:
-    # loops through file line by line and use a hashmap to keep track of latest seen one
-    return {}
+    # write to the file using the dictionary as source of truth
+    file = open(new_segment_path, "w+")
+    for id, offset in index_table.items():
+        data_file.seek(offset)
+        record = data_file.readline()
+        file.write(record)
+
+    file.flush()
+    compacted_size = os.fstat(file.fileno()).st_size
+    print(f"new compacted file size: {compacted_size} bytes")
+
+    # check if after compaction still too big (prob would have to break up the file)
+    if compacted_size > MAX_SEGMENT_SIZE:
+        print("---File still bigger than max seg size after compaction :(---")
+
+    updated_index_table = read_data_file(file)
+    file.close()
+    return updated_index_table
 
 
 # takes directory, and for every directory call_read_data_file, returns list of index tables
@@ -49,15 +63,6 @@ def read_segments(paths: list[Path]) -> list[dict]:
 def read_data_file(data_file: TextIO) -> dict | None:
     index_table = {}
 
-    # get current size
-    file_size = os.fstat(data_file.fileno()).st_size
-
-    # if file size is greater than 128, perform compaction
-    if file_size > MAX_SEGMENT_SIZE:
-        # compaction
-        print("hello world")
-
-
     data_file.seek(0)
 
     while True:
@@ -69,7 +74,7 @@ def read_data_file(data_file: TextIO) -> dict | None:
             break
 
         line_split = line.split(",", 1)
-        print(line_split)
+        # print(line_split)
 
         index_table[int(line_split[0])] = current_pointer_position
 
@@ -178,7 +183,18 @@ def main_loop(records: dict, open_file: TextIO):
 data = input("enter file name: ")
 data_file = open(f"data/{data}.txt", "a+")
 index_table = read_data_file(data_file)
-print(index_table)
+print(f"index table before compaction: {index_table}")
+
+data_file_size = os.fstat(data_file.fileno()).st_size
+print(f"file size: {data_file_size} bytes")
+
+# if file size is greater than 128, perform compaction
+if (data_file_size > MAX_SEGMENT_SIZE):
+    print("File is large than threshold, performing compaction...\n")
+    index_table = compact(data_file, index_table)
+
+
+print(f"index table after compaction: {index_table}")
 
 # paths = []
 # for f in dir_path.iterdir():
