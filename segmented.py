@@ -2,7 +2,7 @@
 from typing import TextIO
 import json
 from pathlib import Path
-from datetime import datetime
+import os
 # Use an in-memory hash map to retrieve contents of file in disk
 
 # each key is mapped to byte offset in data file
@@ -15,35 +15,29 @@ from datetime import datetime
 # segment files are immutable, meaning when merging, generate a new segment
 # the merging will be performed using a background worker thread
 # while merging is being performed serve data from segment files
-# each segment now has its own in-memory index table, やば
+# each segment now has its own in-memory index table 
 
 # for now keep .txt but in future try binary format
 
 # For now just give a directory, the program will use this directory and the files inside
 # to construct in-memory hash table
 
+# Once this limit is hit, then just perform compaction by removing dupes
+# Ofc it has limits, like if every entry is unique then compaction is useless
+# For that case, then implement figure it out later
+MAX_SEGMENT_SIZE = 128
 
-# helper function
-def sort_by_file_timestamp(dir: Path) -> list[Path]:
-    # sorted files by timestamp 当然
-    sorted_files = []
 
-    for f in dir.iterdir():
-        file_stat = f.stat()
-        print("こんにちは")
-        modification_time = datetime.fromtimestamp(file_stat.st_mtime)
-        #sorted_files.append([modification_time, f])
+def compact(data_file: TextIO, index_table: dict) -> dict:
+    # loops through file line by line and use a hashmap to keep track of latest seen one
+    return {}
 
-    
 
-# takes directory, and for every directory call_read_data_file
-def read_segments(dir: Path) -> list[dict]:
+# takes directory, and for every directory call_read_data_file, returns list of index tables
+def read_segments(paths: list[Path]) -> list[dict]:
     index_tables = []
 
-    # since iterdir() does not guarantee order, have to rely on timestamps of file
-    for f in dir.iterdir():
-        if f.name == '.' or f.name == '..':
-            continue
+    for f in paths:
         open_file = open(f, "a+")
         index_tables.append(read_data_file(open_file))
         open_file.close()
@@ -54,6 +48,15 @@ def read_segments(dir: Path) -> list[dict]:
 # reads file with data and build hash map
 def read_data_file(data_file: TextIO) -> dict | None:
     index_table = {}
+
+    # get current size
+    file_size = os.fstat(data_file.fileno()).st_size
+
+    # if file size is greater than 128, perform compaction
+    if file_size > MAX_SEGMENT_SIZE:
+        # compaction
+        print("hello world")
+
 
     data_file.seek(0)
 
@@ -167,10 +170,25 @@ def main_loop(records: dict, open_file: TextIO):
 
 
 # for now just make data path 'data'
-dir_path_input = input("enter directory name: ")
-dir_path = Path(f"{dir_path_input}")
+# dir_path_input = input("enter directory name: ")
+# dir_path = Path(f"{dir_path_input}")
 
-indexes = read_segments(dir_path)
+
+
+data = input("enter file name: ")
+data_file = open(f"data/{data}.txt", "a+")
+index_table = read_data_file(data_file)
+print(index_table)
+
+# paths = []
+# for f in dir_path.iterdir():
+#     paths.append(f)
+
+# paths.sort()
+
+# print(paths)
+
+# indexes = read_segments(paths)
 
 '''
 index_table = read_data_file(data_file)

@@ -61,6 +61,9 @@ def insert(records: dict, data_file: TextIO, record_id: int, record: dict) -> No
     data_file.flush()
     records[record_id] = offset
 
+
+def merge():
+    return None
     
 # create some object type with any fields
 def create_entry() -> dict:
