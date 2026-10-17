@@ -1,0 +1,3 @@
+101,{"name": "Rukia", "age": "25"}
+109,{"name": "Ichigo", "occupation": "soul reaper"}
+202,{"brand": "toyota", "price": 15000}

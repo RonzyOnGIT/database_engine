@@ -3,7 +3,6 @@ from typing import TextIO
 import json
 from pathlib import Path
 import os
-# Use an in-memory hash map to retrieve contents of file in disk
 
 # achieve compaction by throwing away duplicate keys in log, and keeping only most recent update for each key
 # a segment is essentially one log file
@@ -14,11 +13,6 @@ import os
 
 # for now keep .txt but in future try binary format
 
-# For now just give a directory, the program will use this directory and the files inside
-# to construct in-memory hash table
-
-# Once this limit is hit, then just perform compaction by removing dupes
-# Ofc it has limits, like if every entry is unique then compaction is useless
 MAX_SEGMENT_SIZE = 128
 
 # have to test this out first
@@ -35,16 +29,50 @@ def compact(data_file: TextIO, index_table: dict) -> dict | None:
         file.write(record)
 
     file.flush()
-    compacted_size = os.fstat(file.fileno()).st_size
-    print(f"new compacted file size: {compacted_size} bytes")
-
-    # check if after compaction still too big (prob would have to break up the file)
-    if compacted_size > MAX_SEGMENT_SIZE:
-        print("---File still bigger than max seg size after compaction :(---")
 
     updated_index_table = read_data_file(file)
     file.close()
     return updated_index_table
+
+# split segment file into multiple segments, I think for now it doesnt return anything
+# after this gets called, just call read_file to populate new index tables? 
+# So what should I return? if after doing segmenting, theres now potentially dozens of new segment files, each of which need their own index_table
+# might be better to create a class or something to keep track of all the index tables, good OOP practice as well!
+def segment(original_segment: TextIO, index_table: dict) -> None:
+    og_path = Path(original_segment.name)
+    seg_num = int(og_path.stem.split("_")[-1])
+
+    new_path = og_path.parent / f"segment_{seg_num + 1}.txt"
+
+    # for first run, already know file is full so create new file
+    new_file = open(new_path, "w+")
+
+    # keep track of how many new segment files created for file naming
+    segment_counter = 1
+
+    for id, offset in index_table.items():
+        original_segment.seek(offset)
+        record = original_segment.readline()
+
+        # check to see if new file can add this record
+        record_size = len(record.encode(original_segment.encoding))
+        new_file.flush()
+        new_file_size = os.fstat(new_file.fileno()).st_size
+
+        # check if this record itself is bigger than max seg size
+        if record_size >= MAX_SEGMENT_SIZE:
+            # just ignore the record 笑
+            continue
+
+        if new_file_size + record_size > MAX_SEGMENT_SIZE:
+            # too big need to create new file and start writing here instead
+            new_file.close()
+            segment_counter += 1
+            new_path = og_path.parent / f"segment_{seg_num + segment_counter}.txt"
+            new_file = open(new_path, "w+")
+        new_file.write(record)
+
+    new_file.close()
 
 
 # takes directory, and for every directory call_read_data_file, returns list of index tables
@@ -74,8 +102,6 @@ def read_data_file(data_file: TextIO) -> dict | None:
             break
 
         line_split = line.split(",", 1)
-        # print(line_split)
-
         index_table[int(line_split[0])] = current_pointer_position
 
     return index_table
@@ -174,11 +200,6 @@ def main_loop(records: dict, open_file: TextIO):
         print("[3] QUIT Stop db engine")
 
 
-# for now just make data path 'data'
-# dir_path_input = input("enter directory name: ")
-# dir_path = Path(f"{dir_path_input}")
-
-
 
 data = input("enter file name: ")
 data_file = open(f"data/{data}.txt", "a+")
@@ -193,32 +214,18 @@ if (data_file_size > MAX_SEGMENT_SIZE):
     print("File is large than threshold, performing compaction...\n")
     index_table = compact(data_file, index_table)
 
-
-print(f"index table after compaction: {index_table}")
-
-# paths = []
-# for f in dir_path.iterdir():
-#     paths.append(f)
-
-# paths.sort()
-
-# print(paths)
-
-# indexes = read_segments(paths)
-
-'''
-index_table = read_data_file(data_file)
-print(index_table)
-
-main_loop(index_table, data_file)
-
 data_file.close()
 
+data_file = open("data/segment_2.txt", "a+")
 
-# Define the directory
-dir_path = Path("path/to/directory")
+compacted_size = os.fstat(data_file.fileno()).st_size
+print(f"new compacted file size: {compacted_size} bytes")
+print(f"index table after compaction: {index_table}")
+      
+# check if after compaction still too big (prob would have to break up the file)
+if compacted_size > MAX_SEGMENT_SIZE:
+    print("---File still bigger than max seg size after compaction :(---")
+    # split into multiple segments
+    segment(data_file, index_table)
 
-# List all files and folders inside
-for item in dir_path.iterdir():
-    print(item.name)
-'''
+data_file.close()
