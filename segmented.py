@@ -16,12 +16,18 @@ import os
 MAX_SEGMENT_SIZE = 128
 
 # have to test this out first
+# When file is above threshold limit, creates new compacted file
+# In the new compacted file, any duplicate ID entries are removed
+# The index_table is the source of truth when writing this new de-duplicated db file
 def compact(data_file: TextIO, index_table: dict) -> dict | None:
     original_path = Path(data_file.name)
     segment_num = int(original_path.stem.split("_")[-1])
     new_segment_path = original_path.parent / f"segment_{segment_num + 1}.txt"
 
     # write to the file using the dictionary as source of truth
+    # note that the order in which the new file is written is entirely dependant- 
+    # on reading dictionary which the order is arbritrary. i.e. the new file being written cannnot
+    # guarantee the same order as the original file (maybe come back to this and figure out workarounds for this although I don't see this being an issue for now)
     file = open(new_segment_path, "w+")
     for id, offset in index_table.items():
         data_file.seek(offset)
@@ -87,7 +93,7 @@ def read_segments(paths: list[Path]) -> list[dict]:
     print(f"Index tables for all segments: {index_tables}")
 
 # this now turns into helper function
-# reads file with data and build hash map
+# reads file with data and build hash map, seeks to zero before anything
 def read_data_file(data_file: TextIO) -> dict | None:
     index_table = {}
 
@@ -200,32 +206,32 @@ def main_loop(records: dict, open_file: TextIO):
         print("[3] QUIT Stop db engine")
 
 
+if __name__ == '__main__':
+    data = input("enter file name: ")
+    data_file = open(f"data/{data}.txt", "a+")
+    index_table = read_data_file(data_file)
+    print(f"index table before compaction: {index_table}")
 
-data = input("enter file name: ")
-data_file = open(f"data/{data}.txt", "a+")
-index_table = read_data_file(data_file)
-print(f"index table before compaction: {index_table}")
+    data_file_size = os.fstat(data_file.fileno()).st_size
+    print(f"file size: {data_file_size} bytes")
 
-data_file_size = os.fstat(data_file.fileno()).st_size
-print(f"file size: {data_file_size} bytes")
+    # if file size is greater than 128, perform compaction
+    if (data_file_size > MAX_SEGMENT_SIZE):
+        print("File is large than threshold, performing compaction...\n")
+        index_table = compact(data_file, index_table)
 
-# if file size is greater than 128, perform compaction
-if (data_file_size > MAX_SEGMENT_SIZE):
-    print("File is large than threshold, performing compaction...\n")
-    index_table = compact(data_file, index_table)
+    data_file.close()
 
-data_file.close()
+    data_file = open("data/segment_2.txt", "a+")
 
-data_file = open("data/segment_2.txt", "a+")
+    compacted_size = os.fstat(data_file.fileno()).st_size
+    print(f"new compacted file size: {compacted_size} bytes")
+    print(f"index table after compaction: {index_table}")
 
-compacted_size = os.fstat(data_file.fileno()).st_size
-print(f"new compacted file size: {compacted_size} bytes")
-print(f"index table after compaction: {index_table}")
-      
-# check if after compaction still too big (prob would have to break up the file)
-if compacted_size > MAX_SEGMENT_SIZE:
-    print("---File still bigger than max seg size after compaction :(---")
-    # split into multiple segments
-    segment(data_file, index_table)
+    # check if after compaction still too big (prob would have to break up the file)
+    if compacted_size > MAX_SEGMENT_SIZE:
+        print("---File still bigger than max seg size after compaction :(---")
+        # split into multiple segments
+        segment(data_file, index_table)
 
-data_file.close()
+    data_file.close()

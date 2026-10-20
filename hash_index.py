@@ -7,6 +7,7 @@ import json
 # Whenever u want to look up value, use hash map to find offset in data file, seek to that location and read the value
 # data is stored on disk as an append-only file
 
+# in future, consider instead of just writing text, to do bytes since windows does \r\n instead of just \n, windows being L no surprise
 
 # reads file with data and build hash map
 def read_data_file(data_file: TextIO) -> dict | None:

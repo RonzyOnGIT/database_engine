@@ -1,3 +1,4 @@
 features_to_work_on.txt
 features.txt
-
+.venv
+__pycache__/
