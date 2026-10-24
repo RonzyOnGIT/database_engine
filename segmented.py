@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import os
 import sys
+from segment import Segment
 
 # achieve compaction by throwing away duplicate keys in log, and keeping only most recent update for each key
 # a segment is essentially one log file
@@ -15,7 +16,7 @@ import sys
 # for now keep .txt but in future try binary format
 
 # MAX_SEGMENT_SIZE = 128
-MAX_SEGMENT_SIZE = 256
+MAX_SEGMENT_SIZE = 306
 
 # have to test this out first
 # When file is above threshold limit, creates new compacted file
@@ -41,6 +42,18 @@ def compact(data_file: TextIO, index_table: dict) -> dict | None:
     updated_index_table = read_data_file(file)
     file.close()
     return updated_index_table
+
+
+# compact by reading multiple segments and produce one de-duped new segment
+# assumes segments are sorted in descending order
+# [segment_3.txt, segment_2.txt, segment_1.txt]
+# read files in descending order due to fact that segments with higher number hold most recent state for duplicated values
+def compact_many(segments: list[Segment]) -> Path:
+    # returns a new file path for new compacted ones
+    new_seg_num = segments[0].seg_num + 1
+    compacted_path = segments[0].path.parent / f"segment_{new_seg_num}.txt"
+
+    return None
 
 # split segment file into multiple segments, I think for now it doesnt return anything
 # after this gets called, just call read_file to populate new index tables? 
@@ -85,16 +98,18 @@ def segment(original_segment: TextIO, index_table: dict) -> None:
 
 # takes directory, and for every directory call_read_data_file, returns list of index tables
 # for now not using thi
-def read_segments(dir: Path) -> list[dict]:
-    index_tables = []
+def read_segments(dir: Path) -> list[Segment]:
+    segments = []
 
+    # in future, handle possibility of not being file rather than just blindly creating an object from this
     for f in dir.iterdir():
+        segment_file = Segment(f)
         open_file = open(f, "a+")
-        index_tables.append(read_data_file(open_file))
+        segment_file.index_table = read_data_file(open_file)
         open_file.close()
+        segments.append(segment_file)
 
-
-    return index_tables
+    return segments
 
 # this now turns into helper function
 # reads file with data and build hash map, seeks to zero before anything
@@ -255,8 +270,11 @@ if __name__ == '__main__':
             sys.exit()
 
         # path is valid good, now call methods
-        index_tables = read_segments(path)
-        print(f"Index tables for all segments: {index_tables}")
+        segments = read_segments(path)
+        # sort descending based on segment number
+        segments.sort(key = lambda seg: seg.seg_num, reverse = True)
+        for seg in segments:
+            print(seg)
         
 
     else:
