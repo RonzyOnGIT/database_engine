@@ -3,6 +3,7 @@ from typing import TextIO
 import json
 from pathlib import Path
 import os
+import sys
 
 # achieve compaction by throwing away duplicate keys in log, and keeping only most recent update for each key
 # a segment is essentially one log file
@@ -13,7 +14,8 @@ import os
 
 # for now keep .txt but in future try binary format
 
-MAX_SEGMENT_SIZE = 128
+# MAX_SEGMENT_SIZE = 128
+MAX_SEGMENT_SIZE = 256
 
 # have to test this out first
 # When file is above threshold limit, creates new compacted file
@@ -82,15 +84,17 @@ def segment(original_segment: TextIO, index_table: dict) -> None:
 
 
 # takes directory, and for every directory call_read_data_file, returns list of index tables
-def read_segments(paths: list[Path]) -> list[dict]:
+# for now not using thi
+def read_segments(dir: Path) -> list[dict]:
     index_tables = []
 
-    for f in paths:
+    for f in dir.iterdir():
         open_file = open(f, "a+")
         index_tables.append(read_data_file(open_file))
         open_file.close()
 
-    print(f"Index tables for all segments: {index_tables}")
+
+    return index_tables
 
 # this now turns into helper function
 # reads file with data and build hash map, seeks to zero before anything
@@ -207,31 +211,53 @@ def main_loop(records: dict, open_file: TextIO):
 
 
 if __name__ == '__main__':
-    data = input("enter file name: ")
-    data_file = open(f"data/{data}.txt", "a+")
-    index_table = read_data_file(data_file)
-    print(f"index table before compaction: {index_table}")
 
-    data_file_size = os.fstat(data_file.fileno()).st_size
-    print(f"file size: {data_file_size} bytes")
+    print("single file or multi file?\n")
+    print("[1]: single file")
+    print("[2]: multi file")
+    mode = int(input("response:" ))
 
-    # if file size is greater than 128, perform compaction
-    if (data_file_size > MAX_SEGMENT_SIZE):
-        print("File is large than threshold, performing compaction...\n")
-        index_table = compact(data_file, index_table)
+    if mode == 1:
+        data = input("enter file name: ")
+        data_file = open(f"data/{data}.txt", "a+")
+        index_table = read_data_file(data_file)
+        print(f"index table before compaction: {index_table}")
 
-    data_file.close()
+        data_file_size = os.fstat(data_file.fileno()).st_size
+        print(f"file size: {data_file_size} bytes")
 
-    data_file = open("data/segment_2.txt", "a+")
+        # if file size is greater than 128, perform compaction
+        if (data_file_size > MAX_SEGMENT_SIZE):
+            print("File is large than threshold, performing compaction...\n")
+            index_table = compact(data_file, index_table)
 
-    compacted_size = os.fstat(data_file.fileno()).st_size
-    print(f"new compacted file size: {compacted_size} bytes")
-    print(f"index table after compaction: {index_table}")
+        data_file.close()
 
-    # check if after compaction still too big (prob would have to break up the file)
-    if compacted_size > MAX_SEGMENT_SIZE:
-        print("---File still bigger than max seg size after compaction :(---")
-        # split into multiple segments
-        segment(data_file, index_table)
+        data_file = open("data/segment_2.txt", "a+")
 
-    data_file.close()
+        compacted_size = os.fstat(data_file.fileno()).st_size
+        print(f"new compacted file size: {compacted_size} bytes")
+        print(f"index table after compaction: {index_table}")
+
+        # check if after compaction still too big (prob would have to break up the file)
+        if compacted_size > MAX_SEGMENT_SIZE:
+            print("---File still bigger than max seg size after compaction :(---")
+            # split into multiple segments
+            segment(data_file, index_table)
+
+        data_file.close()
+    elif mode == 2:
+        # multi mode so open directory with multiple files
+        path = Path(input("\nEnter directory name: "))
+        
+        if not path.exists():
+            print("invalid path, cya")
+            sys.exit()
+
+        # path is valid good, now call methods
+        index_tables = read_segments(path)
+        print(f"Index tables for all segments: {index_tables}")
+        
+
+    else:
+        print("invalid response, cya")
