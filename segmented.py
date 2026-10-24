@@ -48,12 +48,32 @@ def compact(data_file: TextIO, index_table: dict) -> dict | None:
 # assumes segments are sorted in descending order
 # [segment_3.txt, segment_2.txt, segment_1.txt]
 # read files in descending order due to fact that segments with higher number hold most recent state for duplicated values
-def compact_many(segments: list[Segment]) -> Path:
+def compact_many(segments: list[Segment]) -> tuple[Path, dict]:
     # returns a new file path for new compacted ones
     new_seg_num = segments[0].seg_num + 1
     compacted_path = segments[0].path.parent / f"segment_{new_seg_num}.txt"
+    seen = set()
+    # Use x+ in case file aready exists, will raise an error to not write to same file
+    new_compact_file = open(compacted_path, "x+")
 
-    return None
+    for seg in segments:
+        f = open(seg.path, "r")
+        # open file, now after open, go through the index table for that specific segment and write to new one
+        for id, offset in seg.index_table.items():
+            if id in seen:
+                # already have seen most recent state for this ID, ignore it and move on
+                continue
+            f.seek(offset)
+            record = f.readline()
+            new_compact_file.write(record)
+            seen.add(id)
+        f.close()
+
+    new_compact_file.flush()
+    compacted_index_table = read_data_file(new_compact_file)
+    new_compact_file.close()
+    return compacted_path, compacted_index_table
+
 
 # split segment file into multiple segments, I think for now it doesnt return anything
 # after this gets called, just call read_file to populate new index tables? 
@@ -248,8 +268,6 @@ if __name__ == '__main__':
 
         data_file.close()
 
-        data_file = open("data/segment_2.txt", "a+")
-
         compacted_size = os.fstat(data_file.fileno()).st_size
         print(f"new compacted file size: {compacted_size} bytes")
         print(f"index table after compaction: {index_table}")
@@ -275,7 +293,10 @@ if __name__ == '__main__':
         segments.sort(key = lambda seg: seg.seg_num, reverse = True)
         for seg in segments:
             print(seg)
-        
 
+        # now test the compaction on multiple segments
+        [new_path, new_index_table] = compact_many(segments)
+        print(f"New index table: {new_index_table}")
+        segments.clear()
     else:
         print("invalid response, cya")
