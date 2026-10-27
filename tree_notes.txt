@@ -1,0 +1,33 @@
+Deciding between AVL Tree and Red-Black Tree, both are self-balancing trees. For now just implement using Red-Balck Tree
+
+Most of these notes I got from: "https://www.geeksforgeeks.org/dsa/introduction-to-red-black-tree/"
+
+---------------------------------------------------------------------
+Refresher on rotations
+Right rotation:
+	1) left subtree root becomes new root
+	2) New root's right child will be the old root
+	3) New root's old right subtree is now the old root's left subtree
+Left rotation:
+	1) newRoot.left = oldRoot
+	2) oldRoot.right = oldLeft
+
+
+---------------------------------------------------------------------
+Red-Black Tree:
+	- Self balancing
+	- Height limitof O(log(N))
+	- Average operations (deletion, search insertion of log(N))
+	- Each node has an additional attribute: color (red or black)
+	- Properties of tree:
+		- Node color: each node is either red or black
+		- Root property: Root of tree is always black
+		- Red node property: Red nodes cannot have red children
+		- Black node property: Every path from a node
+		- All leaf nodes are black
+
+	- Above properties ensure that the longest path from root to any leaf is no more than twice as long as shortest path
+
+	- Height of tree with N nodes is h <= 2log(N + 1)
+---------------------------------------------------------------------
+	
