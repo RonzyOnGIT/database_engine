@@ -4,18 +4,17 @@ class Memtable:
         Each node needs 3 attributes
             1) color
             2) key (sorted value)
-            3) value of actual data
-    '''
+            3) value of actual data (not byte offset like hash index)
+            4) left
+            5) right
+            6) parent
 
+    '''
+class Node:
     def __init__(self):
-        # on creation, can just set it to NULL for now
-        
-        print('hello')
-
-    '''
-        Insertion:
-            - Two cases to consider:
-                1) If parent of new inserted node is black, in the clear
-                2) If parent is red, tree might violate Adjacent Red nodes, fix
-
-    ''' 
+        self.color = 'Black'
+        self.key = None 
+        self.value = None 
+        self.left = None 
+        self.right = None 
+        self.parent = None
