@@ -295,7 +295,7 @@ if __name__ == '__main__':
             print(seg)
 
         # now test the compaction on multiple segments
-        [new_path, new_index_table] = compact_many(segments)
+        new_path, new_index_table = compact_many(segments)
         print(f"New index table: {new_index_table}")
         segments.clear()
     else:

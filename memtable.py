@@ -122,3 +122,20 @@ class Memtable:
             return
 
         self.fix_insert(node)
+
+    def inorder(self, node: Node):
+        if node != self.NIL:
+            self.inorder(node.left)
+            print(f"key: {node.key}\tvalue: {node.value}")
+            self.inorder(node.right)
+
+    def binary_search(self, node: Node, search_key: int) -> dict | None:
+        while node != self.NIL:
+            if node.key == search_key:
+                return node.value
+            elif search_key > node.key:
+                node = node.right 
+            else:
+                node = node.left
+
+        return None

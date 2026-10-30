@@ -153,15 +153,9 @@ def read_data_file(data_file: TextIO) -> dict | None:
     return index_table
 
 # returns record given an ID
-def get(record_id: int, records: dict, data_file: TextIO) -> dict | None:
-    if record_id in records:
-        byte_offset = records[record_id]
-        data_file.seek(byte_offset)
-        record = data_file.readline()
-        record_split = record.split(",", 1)
-        return json.loads(record_split[1])
-    else:
-        return None
+def get(memtable: Memtable, search_id: int) -> dict | None:
+    record = memtable.binary_search(memtable.root, search_id)
+    return record
 
 # records is the in-memory hashmap that stores the id: byte_offset
 def insert(memtable: Memtable, key: int, value: dict) -> None:
@@ -222,6 +216,7 @@ def main_loop(memtable: Memtable):
         elif res == 2:
             record_id = int(input("enter id: "))
             record = create_entry()
+            # figure out what to do with duplicate entries
             insert(memtable, record_id, record)
         else:
             print("invalid response")
@@ -232,8 +227,9 @@ def main_loop(memtable: Memtable):
 
 
 if __name__ == '__main__':
-    print("hello world")
     # only need 1 memtable per process
     # can have multiple segments 
     memtable = Memtable()
+    print("----Empty Memtable Created!----")
     main_loop(memtable)
+    memtable.inorder(memtable.root)
