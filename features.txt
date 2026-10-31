@@ -1,6 +1,6 @@
 Changes To make to go from hash table segmentation to SSTables and LSM-trees:
-	- Entries in the database must be sorted by key
-	- Each entry must be unique within a segment
+	[✓] Entries in the database must be sorted by key
+	[✓] Each entry must be unique within a segment
 	- For lookups, no longer need to keep every index in in-memory index table, instead just keep a couple of them in the table and perform binary search
 	- Within each segment, each entry in the index table, will point to a compressed block of records. In order to find some record, perform binary search to find whether the record could be within a compressed block
 	- Need to implement some data structure that will handle sorting keys and has to be in-memory (Red-Black tree, AVL tree) this in-memory table is sometimes called a memtable

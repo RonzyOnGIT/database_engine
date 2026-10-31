@@ -1,4 +1,6 @@
 # got the code from geeksforgeeks' implementation of red-black tree
+from constants import MAX_SEGMENT_SIZE
+import json
 class Node:
     # Each node's value will actually store the data, not byte offset like in index table implementation
     def __init__(self, key: int | None = None, value: dict | None = None):
@@ -15,6 +17,7 @@ class Memtable:
         self.NIL = Node()
         self.NIL.color = "BLACK"
         self.root = self.NIL
+        self.size = 0 # tracks size in bytes of current memtable
 
     def left_rotate(self, x: Node):
         y_node = x.right 
@@ -96,12 +99,21 @@ class Memtable:
         parent = None
         current = self.root
 
+        size = len(json.dumps(value).encode('utf-8'))
+
         # Step 1: Standard Binary Search Tree insertion
         while current != self.NIL:
             parent = current
-            # if duplicate, then just overwrite the value
+            # if duplicate, then just overwrite the value. Update new size as well
             if key == current.key:
+                prev_size = len(json.dumps(current.value).encode('utf-8'))
+                size_diff = size - prev_size 
+                if (self.size + size_diff) > MAX_SEGMENT_SIZE:
+                    print('Duplicate entry exceeds threshold, keeping original entry')
+                    return
+                print(f"memtable size: {self.size} bytes")
                 current.value = value
+                self.size += size_diff
                 return
             elif node.key < current.key:
                 current = current.left
@@ -109,6 +121,13 @@ class Memtable:
                 current = current.right
 
         node.parent = parent
+
+        if (self.size + size) > MAX_SEGMENT_SIZE:
+            print('New entry exceeds threshold, writing to disk...')
+            return
+
+        self.size += size
+        print(f"memtable size: {self.size} bytes")
 
         if parent is None:
             self.root = node

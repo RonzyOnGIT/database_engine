@@ -6,6 +6,7 @@ import os
 import sys
 from segment import Segment
 from memtable import Memtable
+from constants import MAX_SEGMENT_SIZE
 
 # achieve compaction by throwing away duplicate keys in log, and keeping only most recent update for each key
 # a segment is essentially one log file
@@ -17,7 +18,7 @@ from memtable import Memtable
 # for now keep .txt but in future try binary format
 
 # MAX_SEGMENT_SIZE = 128
-MAX_SEGMENT_SIZE = 306
+# MAX_SEGMENT_SIZE = 306
 
 # have to test this out first
 # When file is above threshold limit, creates new compacted file
