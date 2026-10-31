@@ -209,6 +209,7 @@ def main_loop(memtable: Memtable):
 
         if res == 1:
             record_id = int(input("Enter ID to look up: "))
+            record = get(memtable, record_id)
             if record is None:
                 print("no record found\n")
             else:
@@ -216,7 +217,6 @@ def main_loop(memtable: Memtable):
         elif res == 2:
             record_id = int(input("enter id: "))
             record = create_entry()
-            # figure out what to do with duplicate entries
             insert(memtable, record_id, record)
         else:
             print("invalid response")

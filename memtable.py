@@ -93,14 +93,17 @@ class Memtable:
         node.value = value
         node.left = self.NIL
         node.right = self.NIL
-
         parent = None
         current = self.root
 
         # Step 1: Standard Binary Search Tree insertion
         while current != self.NIL:
             parent = current
-            if node.key < current.key:
+            # if duplicate, then just overwrite the value
+            if key == current.key:
+                current.value = value
+                return
+            elif node.key < current.key:
                 current = current.left
             else:
                 current = current.right
