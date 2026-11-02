@@ -7,6 +7,8 @@ import sys
 from segment import Segment
 from memtable import Memtable
 from constants import MAX_SEGMENT_SIZE
+from insert_status import InsertStatus
+from sstable import Sstable
 
 # achieve compaction by throwing away duplicate keys in log, and keeping only most recent update for each key
 # a segment is essentially one log file
@@ -153,19 +155,38 @@ def read_data_file(data_file: TextIO) -> dict | None:
 
     return index_table
 
+def write_to_sstable(sstable: Sstable, memtable: Memtable) -> Sstable:
+    # go in order through the memtable and then
+    # open the file in a+ mode
+    f = open(sstable.path, "a+")
+    # now that file is open, have to make one entry be one string including the new line
+    for key, value in memtable.inorder_write(memtable.root):
+        # encode 
+        value_json = json.dumps(value)
+        entry = str(key) + "," + value_json + "\n"
+        f.seek(0, 2)
+
+
+    f.close()
+
 # returns record given an ID
 def get(memtable: Memtable, search_id: int) -> dict | None:
     record = memtable.binary_search(memtable.root, search_id)
     return record
 
 # records is the in-memory hashmap that stores the id: byte_offset
-def insert(memtable: Memtable, key: int, value: dict) -> None:
+def insert(memtable: Memtable, key: int, value: dict) -> InsertStatus:
     # fail if nothing to insert
     if not value:
-        return
+        return InsertStatus.FAIL
 
-    memtable.insert(key, value)
-    
+    status = memtable.insert(key, value)
+    if status == InsertStatus.TOO_LARGE:
+        # call method to write sstable, then retry again after memtable has been cleared
+        print("hello world")
+        return InsertStatus.FAIL
+    return InsertStatus.INSERTED
+
 # create some object type with any fields
 def create_entry() -> dict:
     entry = {}
@@ -194,7 +215,8 @@ def create_entry() -> dict:
         
     return entry
 
-def main_loop(memtable: Memtable):
+# kinda sloppy, but I will keep propagting errors up until hit main() to keep all the object creation in main() 
+def main_loop(memtable: Memtable) -> None | InsertStatus:
     print("-----------------------")
     print("Simple database engine using hashmap\n")
     print("[1] GET Look up a record")
@@ -218,7 +240,9 @@ def main_loop(memtable: Memtable):
         elif res == 2:
             record_id = int(input("enter id: "))
             record = create_entry()
-            insert(memtable, record_id, record)
+            status = insert(memtable, record_id, record)
+            if status == InsertStatus.TOO_LARGE:
+                return InsertStatus.TOO_LARGE
         else:
             print("invalid response")
 
@@ -229,8 +253,15 @@ def main_loop(memtable: Memtable):
 
 if __name__ == '__main__':
     # only need 1 memtable per process
-    # can have multiple segments 
+    # can have multiple sstables (segments) 
+    sstable_segment = None
     memtable = Memtable()
     print("----Empty Memtable Created!----")
-    main_loop(memtable)
-    memtable.inorder(memtable.root)
+    status = main_loop(memtable)
+    if status is None:
+        memtable.inorder(memtable.root)
+    elif status == InsertStatus.TOO_LARGE:
+        print("creating segment file")
+        sstable_segment = Sstable("sstables/sstable_1.txt")
+        # sstable created now have to write to it
+        # write_to_sstable()

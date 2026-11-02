@@ -1,5 +1,6 @@
 # got the code from geeksforgeeks' implementation of red-black tree
 from constants import MAX_SEGMENT_SIZE
+from insert_status import InsertStatus
 import json
 class Node:
     # Each node's value will actually store the data, not byte offset like in index table implementation
@@ -91,7 +92,7 @@ class Memtable:
                     self.left_rotate(k.parent.parent)
         self.root.color = "BLACK"  # Root must always be Black
 
-    def insert(self, key: int, value: dict):
+    def insert(self, key: int, value: dict) -> InsertStatus:
         node = Node(key)
         node.value = value
         node.left = self.NIL
@@ -110,11 +111,11 @@ class Memtable:
                 size_diff = size - prev_size 
                 if (self.size + size_diff) > MAX_SEGMENT_SIZE:
                     print('Duplicate entry exceeds threshold, keeping original entry')
-                    return
+                    return InsertStatus.TOO_LARGE
                 print(f"memtable size: {self.size} bytes")
                 current.value = value
                 self.size += size_diff
-                return
+                return InsertStatus.INSERTED
             elif node.key < current.key:
                 current = current.left
             else:
@@ -124,7 +125,10 @@ class Memtable:
 
         if (self.size + size) > MAX_SEGMENT_SIZE:
             print('New entry exceeds threshold, writing to disk...')
-            return
+            return InsertStatus.TOO_LARGE
+            # write to disk here
+            # construct a path, insert the path there
+            # each segment file will have an index table, but will be sparse entries, also compress entries into blocks
 
         self.size += size
         print(f"memtable size: {self.size} bytes")
@@ -139,17 +143,27 @@ class Memtable:
         # Step 2: Handle edge cases and fix RB properties
         if node.parent is None:
             node.color = "BLACK"
-            return
+            return InsertStatus.INSERTED
         if node.parent.parent is None:
-            return
+            return InsertStatus.INSERTED
 
         self.fix_insert(node)
+        return InsertStatus.INSERTED
 
     def inorder(self, node: Node):
         if node != self.NIL:
             self.inorder(node.left)
             print(f"key: {node.key}\tvalue: {node.value}")
             self.inorder(node.right)
+
+    # function generator version of inorder used for writing sstables
+    def inorder_write(self, node: Node):
+        if node != self.NIL:
+            yield from self.inorder(node.left)
+            yield node.key, node.value 
+            yield from self.inorder(node.right)
+
+
 
     def binary_search(self, node: Node, search_key: int) -> dict | None:
         while node != self.NIL:
