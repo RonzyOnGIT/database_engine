@@ -6,7 +6,7 @@ import os
 import sys
 from segment import Segment
 from memtable import Memtable
-from constants import MAX_SEGMENT_SIZE
+from constants import MAX_SEGMENT_SIZE, FREQUENCY_ENCODING_INTERVAL
 from insert_status import InsertStatus
 from sstable import Sstable
 
@@ -155,19 +155,25 @@ def read_data_file(data_file: TextIO) -> dict | None:
 
     return index_table
 
-def write_to_sstable(sstable: Sstable, memtable: Memtable) -> Sstable:
+def write_to_sstable(sstable: Sstable, memtable: Memtable) -> None:
     # go in order through the memtable and then
     # open the file in a+ mode
     f = open(sstable.path, "a+")
     # now that file is open, have to make one entry be one string including the new line
     for key, value in memtable.inorder_write(memtable.root):
-        # encode 
+        # encode and write
         value_json = json.dumps(value)
         entry = str(key) + "," + value_json + "\n"
         f.seek(0, 2)
-
+        f.write(entry)
+        # write to sstable, now store some of the entries in the index table, but how to know when to store in index tale how frequent
+        # in the book, it says one entry for evey few hundred kilobytes is enough, but my sstables r much smaller, so for now every 256 bytes
+        # so first entry comes along, then encode any further entries, until u reach 256 bytes, then u make another entry
+        # When user wants to fetch a value, and its not found in memtable, start looking in sstables, and perform binary search on each entry in index table
+        # narrow it down to the entry which u think it could be in 
 
     f.close()
+    return
 
 # returns record given an ID
 def get(memtable: Memtable, search_id: int) -> dict | None:
@@ -183,8 +189,7 @@ def insert(memtable: Memtable, key: int, value: dict) -> InsertStatus:
     status = memtable.insert(key, value)
     if status == InsertStatus.TOO_LARGE:
         # call method to write sstable, then retry again after memtable has been cleared
-        print("hello world")
-        return InsertStatus.FAIL
+        return InsertStatus.TOO_LARGE
     return InsertStatus.INSERTED
 
 # create some object type with any fields
@@ -216,7 +221,7 @@ def create_entry() -> dict:
     return entry
 
 # kinda sloppy, but I will keep propagting errors up until hit main() to keep all the object creation in main() 
-def main_loop(memtable: Memtable) -> None | InsertStatus:
+def main_loop(memtable: Memtable) -> None: 
     print("-----------------------")
     print("Simple database engine using hashmap\n")
     print("[1] GET Look up a record")
@@ -242,7 +247,8 @@ def main_loop(memtable: Memtable) -> None | InsertStatus:
             record = create_entry()
             status = insert(memtable, record_id, record)
             if status == InsertStatus.TOO_LARGE:
-                return InsertStatus.TOO_LARGE
+                sstable_seg = Sstable(Path("sstables/sstable_1.txt"))
+                write_to_sstable(sstable_seg, memtable)      
         else:
             print("invalid response")
 
@@ -257,11 +263,5 @@ if __name__ == '__main__':
     sstable_segment = None
     memtable = Memtable()
     print("----Empty Memtable Created!----")
-    status = main_loop(memtable)
-    if status is None:
-        memtable.inorder(memtable.root)
-    elif status == InsertStatus.TOO_LARGE:
-        print("creating segment file")
-        sstable_segment = Sstable("sstables/sstable_1.txt")
-        # sstable created now have to write to it
-        # write_to_sstable()
+    main_loop(memtable)
+    memtable.inorder(memtable.root)

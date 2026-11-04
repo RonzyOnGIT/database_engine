@@ -126,8 +126,6 @@ class Memtable:
         if (self.size + size) > MAX_SEGMENT_SIZE:
             print('New entry exceeds threshold, writing to disk...')
             return InsertStatus.TOO_LARGE
-            # write to disk here
-            # construct a path, insert the path there
             # each segment file will have an index table, but will be sparse entries, also compress entries into blocks
 
         self.size += size
@@ -159,9 +157,9 @@ class Memtable:
     # function generator version of inorder used for writing sstables
     def inorder_write(self, node: Node):
         if node != self.NIL:
-            yield from self.inorder(node.left)
+            yield from self.inorder_write(node.left)
             yield node.key, node.value 
-            yield from self.inorder(node.right)
+            yield from self.inorder_write(node.right)
 
 
 
