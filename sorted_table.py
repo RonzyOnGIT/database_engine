@@ -135,7 +135,6 @@ def read_segments(dir: Path) -> list[Segment]:
 
     return segments
 
-# this now turns into helper function
 # reads file with data and build hash map, seeks to zero before anything
 def read_data_file(data_file: TextIO) -> dict | None:
     index_table = {}
@@ -157,9 +156,8 @@ def read_data_file(data_file: TextIO) -> dict | None:
 
 def write_to_sstable(sstable: Sstable, memtable: Memtable) -> None:
     # go in order through the memtable and then
-    # open the file in a+ mode
     f = open(sstable.path, "a+")
-    # now that file is open, have to make one entry be one string including the new line
+
     for key, value in memtable.inorder_write(memtable.root):
         # encode and write
         value_json = json.dumps(value)
@@ -171,6 +169,7 @@ def write_to_sstable(sstable: Sstable, memtable: Memtable) -> None:
         # so first entry comes along, then encode any further entries, until u reach 256 bytes, then u make another entry
         # When user wants to fetch a value, and its not found in memtable, start looking in sstables, and perform binary search on each entry in index table
         # narrow it down to the entry which u think it could be in 
+        # things to work on this commit - dont drop the item being added 
 
     f.close()
     return
@@ -220,15 +219,21 @@ def create_entry() -> dict:
         
     return entry
 
-# kinda sloppy, but I will keep propagting errors up until hit main() to keep all the object creation in main() 
-def main_loop(memtable: Memtable) -> None: 
+# For now, take in one sstable object and search it, in future, will accept directory and search all sstables
+def search_sstables(sstable: Sstable) -> dict | None:
+    return None
+
+
+def main_loop(memtable: Memtable) -> tuple[Memtable, Sstable]: 
     print("-----------------------")
     print("Simple database engine using hashmap\n")
     print("[1] GET Look up a record")
     print("[2] SET Insert or update record")
     print("[3] QUIT Stop db engine")
 
+    sstable = Sstable(Path("sstables/sstable_1.txt"))
     while True:
+        
         res = int(input(": "))
 
         if res == 3:
@@ -239,6 +244,7 @@ def main_loop(memtable: Memtable) -> None:
             record_id = int(input("Enter ID to look up: "))
             record = get(memtable, record_id)
             if record is None:
+                # did not find it in memtable, start looking to see if it exists in sstables
                 print("no record found\n")
             else:
                 print(record)
@@ -246,15 +252,25 @@ def main_loop(memtable: Memtable) -> None:
             record_id = int(input("enter id: "))
             record = create_entry()
             status = insert(memtable, record_id, record)
+
             if status == InsertStatus.TOO_LARGE:
-                sstable_seg = Sstable(Path("sstables/sstable_1.txt"))
-                write_to_sstable(sstable_seg, memtable)      
+                write_to_sstable(sstable, memtable)      
+            
+                print("Created sstable and dumped current contents of memtable to it")
+                memtable = Memtable()
+                status = insert(memtable, record_id, record)
+                if status == InsertStatus.INSERTED:
+                    print("\nNew memtable has been created and populated with previous record attempt")
+                    memtable.inorder(memtable.root)
+                else:
+                    print("Creation of memtable has failed :(")
         else:
             print("invalid response")
 
         print("[1] GET Look up a record")
         print("[2] SET Insert or update record")
         print("[3] QUIT Stop db engine")
+    return memtable, sstable
 
 
 if __name__ == '__main__':
@@ -263,5 +279,5 @@ if __name__ == '__main__':
     sstable_segment = None
     memtable = Memtable()
     print("----Empty Memtable Created!----")
-    main_loop(memtable)
+    memtable, sstable_segment = main_loop(memtable)
     memtable.inorder(memtable.root)
