@@ -82,7 +82,6 @@ def compact_many(segments: list[Segment]) -> tuple[Path, dict]:
 # split segment file into multiple segments, I think for now it doesnt return anything
 # after this gets called, just call read_file to populate new index tables? 
 # So what should I return? if after doing segmenting, theres now potentially dozens of new segment files, each of which need their own index_table
-# might be better to create a class or something to keep track of all the index tables, good OOP practice as well!
 def segment(original_segment: TextIO, index_table: dict) -> None:
     og_path = Path(original_segment.name)
     seg_num = int(og_path.stem.split("_")[-1])

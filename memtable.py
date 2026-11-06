@@ -100,6 +100,7 @@ class Memtable:
         parent = None
         current = self.root
 
+        # note: size does not include the key, something to think about fixing
         size = len(json.dumps(value).encode('utf-8'))
 
         # Step 1: Standard Binary Search Tree insertion
@@ -160,7 +161,6 @@ class Memtable:
             yield from self.inorder_write(node.left)
             yield node.key, node.value 
             yield from self.inorder_write(node.right)
-
 
 
     def binary_search(self, node: Node, search_key: int) -> dict | None:
