@@ -3,12 +3,13 @@ from typing import TextIO
 import json
 from pathlib import Path
 import os
-import sys
 from segment import Segment
 from memtable import Memtable
 from constants import MAX_SEGMENT_SIZE, FREQUENCY_ENCODING_INTERVAL
 from insert_status import InsertStatus
 from sstable import Sstable
+import zlib
+
 
 # achieve compaction by throwing away duplicate keys in log, and keeping only most recent update for each key
 # a segment is essentially one log file
@@ -155,20 +156,54 @@ def read_data_file(data_file: TextIO) -> dict | None:
 
 def write_to_sstable(sstable: Sstable, memtable: Memtable) -> None:
     # go in order through the memtable and then
-    f = open(sstable.path, "a+")
+    f = open(sstable.path, "ab")
+    uncompressed_block = ''
+    max_uncompressed_size = 250
+    curr_size = 0 # current uncompressed size
+    block_offset = 0 # offset of compressed block, so we know which segment block currently on
+    sstable_offset = 0 # current offset in the sstable
 
     for key, value in memtable.inorder_write(memtable.root):
         # encode and write
         value_json = json.dumps(value)
         entry = str(key) + "," + value_json + "\n"
-        f.seek(0, 2)
-        f.write(entry)
-        # write to sstable, now store some of the entries in the index table, but how to know when to store in index tale how frequent
-        # in the book, it says one entry for evey few hundred kilobytes is enough, but my sstables r much smaller, so for now every 256 bytes
-        # so first entry comes along, then encode any further entries, until u reach 256 bytes, then u make another entry
-        # When user wants to fetch a value, and its not found in memtable, start looking in sstables, and perform binary search on each entry in index table
-        # narrow it down to the entry which u think it could be in 
-        # things to work on this commit - dont drop the item being added 
+
+        # note that the compressed blocks should be like more than a few bytes because any less it get bigger than original from headers
+        # and stuff, also maybe just not a lot of redundancy, can also just specify a different compression technique in compress()
+        entry_size = len(entry.encode())
+
+        # first check to see if this entry is bigger than the max block size
+        if entry_size > max_uncompressed_size:
+            # for now drop it, but maybe in the future I can make the max dynamic? Maybe increase it if frequently dropping stuff
+            f.close()
+            raise ValueError("One of the entries is bigger than current max size for one compressed block")
+    
+        if curr_size == 0:
+            # empty sstable case
+            sstable.index_table[block_offset] = [str(key), sstable_offset]
+            # 'register' the first compressed block with the key of the first item and offset of zero
+            curr_size += entry_size
+            uncompressed_block = entry
+        elif curr_size + entry_size <= max_uncompressed_size:
+            # current entry fits in current block
+            uncompressed_block += entry
+            curr_size += entry_size
+        else:
+            # compress current block and write to sstable, carry over this entry to next block
+            compressed_segment = zlib.compress(uncompressed_block.encode())
+            f.write(compressed_segment)
+
+            block_offset += 1
+            sstable_offset += len(compressed_segment)
+
+            uncompressed_block = entry
+            sstable.index_table[block_offset] = [str(key), sstable_offset]
+            curr_size = 0
+            curr_size += entry_size
+
+    if curr_size > 0:
+        # write any left over stuff
+        f.write(zlib.compress(uncompressed_block.encode()))
 
     f.close()
     return
