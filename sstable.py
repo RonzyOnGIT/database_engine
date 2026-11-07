@@ -3,9 +3,10 @@ from pathlib import Path
 class Sstable:
     def __init__(self, path: Path):
         self.path = path 
-        self.index_table = {}
+        self.index_table = []
         self.file_name = path.stem 
         self.seg_num = int(path.stem.split("_")[-1])
+        # [[id, byte_offset][], []]
 
     def __str__(self):
         return f"Sstable name: {self.file_name}\tFile index: {self.index_table}\tSeg num: {self.seg_num}\tFile path: {self.path}"

@@ -5,7 +5,7 @@ from pathlib import Path
 import os
 from segment import Segment
 from memtable import Memtable
-from constants import MAX_SEGMENT_SIZE, FREQUENCY_ENCODING_INTERVAL
+from constants import MAX_SEGMENT_SIZE 
 from insert_status import InsertStatus
 from sstable import Sstable
 import zlib
@@ -158,9 +158,8 @@ def write_to_sstable(sstable: Sstable, memtable: Memtable) -> None:
     # go in order through the memtable and then
     f = open(sstable.path, "ab")
     uncompressed_block = ''
-    max_uncompressed_size = 250
+    max_uncompressed_size = 125
     curr_size = 0 # current uncompressed size
-    block_offset = 0 # offset of compressed block, so we know which segment block currently on
     sstable_offset = 0 # current offset in the sstable
 
     for key, value in memtable.inorder_write(memtable.root):
@@ -180,7 +179,7 @@ def write_to_sstable(sstable: Sstable, memtable: Memtable) -> None:
     
         if curr_size == 0:
             # empty sstable case
-            sstable.index_table[block_offset] = [str(key), sstable_offset]
+            sstable.index_table.append([str(key), sstable_offset])
             # 'register' the first compressed block with the key of the first item and offset of zero
             curr_size += entry_size
             uncompressed_block = entry
@@ -193,11 +192,10 @@ def write_to_sstable(sstable: Sstable, memtable: Memtable) -> None:
             compressed_segment = zlib.compress(uncompressed_block.encode())
             f.write(compressed_segment)
 
-            block_offset += 1
             sstable_offset += len(compressed_segment)
 
             uncompressed_block = entry
-            sstable.index_table[block_offset] = [str(key), sstable_offset]
+            sstable.index_table.append([str(key), sstable_offset])
             curr_size = 0
             curr_size += entry_size
 
