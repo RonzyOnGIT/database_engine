@@ -252,9 +252,32 @@ def create_entry() -> dict:
     return entry
 
 # For now, take in one sstable object and search it, in future, will accept directory and search all sstables
-def search_sstables(sstable: Sstable) -> dict | None:
-    return None
+def search_sstable(sstable: Sstable, record_id: int) -> dict | None:
+    # assume already looked in memtable, and did not find record
+    # perform binary search on the sstable object's index_table attribute which is an array 
 
+    f = open(sstable.path, "rb")
+
+    # standard binary search
+    l, r = 0, len(sstable.index_table)
+    while l < r:
+        mid = (l + r) // 2
+        # sstable index table structure [[record_id, byte_offset], [], ...]
+        if sstable.index_table[mid][0] == record_id:
+            # have to get size of current block to be able to decompress
+            # in order to do this, just look at current offset and compare with next block's offset and take difference
+            f.seek(sstable.index_table[mid][1]) # seek to compressed block
+            if mid < len(sstable.index_table):
+                current_compressed_size = sstable.index_table[mid + 1][1] - sstable.index_table[mid][1]
+                uncompressed_block = zlib.decompress(f.read(current_compressed_size))
+            else:
+                # this is the last entry, figure out what to do here
+                print("figure this out")
+
+    f.close()
+
+    # implement this next, should be fun
+    return None
 
 def main_loop(memtable: Memtable) -> tuple[Memtable, Sstable]: 
     print("-----------------------")
@@ -294,6 +317,7 @@ def main_loop(memtable: Memtable) -> tuple[Memtable, Sstable]:
                 if status == InsertStatus.INSERTED:
                     print("\nNew memtable has been created and populated with previous record attempt")
                     memtable.inorder(memtable.root)
+                    search_sstable(sstable, 100)
                 else:
                     print("Creation of memtable has failed :(")
         else:
