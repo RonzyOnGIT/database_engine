@@ -258,26 +258,37 @@ def search_sstable(sstable: Sstable, record_id: int) -> dict | None:
 
     f = open(sstable.path, "rb")
 
+    # nex to work -> this only works if the start of the segment ID matches the id being looked for
+    # fix this so that it will look within blocks that it could be in
     # standard binary search
-    l, r = 0, len(sstable.index_table)
-    while l < r:
+    l, r = 0, len(sstable.index_table) - 1
+    while l <= r:
         mid = (l + r) // 2
+        mid_id = sstable.index_table[mid][0]
         # sstable index table structure [[record_id, byte_offset], [], ...]
-        if sstable.index_table[mid][0] == record_id:
+        if mid_id == record_id:
             # have to get size of current block to be able to decompress
             # in order to do this, just look at current offset and compare with next block's offset and take difference
             f.seek(sstable.index_table[mid][1]) # seek to compressed block
-            if mid < len(sstable.index_table):
+            if mid < len(sstable.index_table) - 1:
                 current_compressed_size = sstable.index_table[mid + 1][1] - sstable.index_table[mid][1]
                 uncompressed_block = zlib.decompress(f.read(current_compressed_size))
+                print(f"found matching record: {uncompressed_block.decode()}")
+                f.close()
+                return
             else:
-                # this is the last entry, figure out what to do here
-                print("figure this out")
+                f.seek(sstable.index_table[mid][1])
+                uncompressed_block = zlib.decompress(f.read())
+                print(f"found matching record: {uncompressed_block.decode()}")
+                f.close()
+                return
+        elif record_id > mid_id:
+            l = mid + 1
+        else:
+            r = mid - 1
 
     f.close()
-
-    # implement this next, should be fun
-    return None
+    return 
 
 def main_loop(memtable: Memtable) -> tuple[Memtable, Sstable]: 
     print("-----------------------")
