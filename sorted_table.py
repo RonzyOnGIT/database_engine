@@ -251,6 +251,9 @@ def create_entry() -> dict:
         
     return entry
 
+
+# STUFF TO FIX -> check to make sure I'm good to compare mid_id with record_id
+# ALSO I think im reading in the wrong place in elif in 309
 # For now, take in one sstable object and search it, in future, will accept directory and search all sstables
 def search_sstable(sstable: Sstable, record_id: int) -> dict | None:
     # assume already looked in memtable, and did not find record
@@ -258,8 +261,6 @@ def search_sstable(sstable: Sstable, record_id: int) -> dict | None:
 
     f = open(sstable.path, "rb")
 
-    # nex to work -> this only works if the start of the segment ID matches the id being looked for
-    # fix this so that it will look within blocks that it could be in
     # standard binary search
     l, r = 0, len(sstable.index_table) - 1
     while l <= r:
@@ -273,19 +274,56 @@ def search_sstable(sstable: Sstable, record_id: int) -> dict | None:
             if mid < len(sstable.index_table) - 1:
                 current_compressed_size = sstable.index_table[mid + 1][1] - sstable.index_table[mid][1]
                 uncompressed_block = zlib.decompress(f.read(current_compressed_size))
-                print(f"found matching record: {uncompressed_block.decode()}")
+                decoded_record = uncompressed_block.decode()
+                split_records = decoded_record.split("\n")
+                print(f"found matching record: {split_records[0]}")
                 f.close()
                 return
             else:
                 f.seek(sstable.index_table[mid][1])
                 uncompressed_block = zlib.decompress(f.read())
-                print(f"found matching record: {uncompressed_block.decode()}")
+                decoded_record = uncompressed_block.decode()
+                split_records = decoded_record.split("\n")
+                print(f"found matching record: {split_records[0]}")
                 f.close()
                 return
-        elif record_id > mid_id:
-            l = mid + 1
         else:
-            r = mid - 1
+            if record_id > mid_id:
+                # ok greater, now check to see if less than next block
+                if mid == len(sstable.index_table) - 1:
+                    # check this block
+                    f.seek(sstable.index_table[mid][1])
+                    uncompressed_block = zlib.decompress(f.read())
+                    decoded_record = uncompressed_block.decode()
+                    split_records = decoded_record.split("\n")
+                    # now have to look for each record
+                    for record in split_records:
+                        # use the first comma only as delimiter
+                        split_record = record.split(",", 1)
+                        curr_id = int(split_record[0])
+                        if curr_id == record_id:
+                            print(f"found matching record inside compressed block: {record}")
+                            return
+                    print("record not found")
+                    return
+                elif record_id < sstable.index_table[mid + 1][0]:
+                    # honestly I really should create helper functions, bc this is so much repeated code
+                    current_compressed_size = sstable.index_table[mid + 1][1] - sstable.index_table[mid][1]
+                    uncompressed_block = zlib.decompress(f.read(current_compressed_size))
+                    decoded_record = uncompressed_block.decode()
+                    split_records = decoded_record.split("\n")
+                    for record in split_records:
+                        split_record = record.split(",", 1)
+                        curr_id = int(split_record[0])
+                        if curr_id == record_id:
+                            print(f"found matching record inside compressed block: {record}")
+                            return
+                    print("record not found")
+                    return
+                else:
+                    l = mid + 1
+            else:
+                r = mid - 1
 
     f.close()
     return 
